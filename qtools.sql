@@ -62,10 +62,12 @@ INSERT INTO `syntax` (`subject`,`help`)
 VALUES
 ('version','Returns current version of qtools.'),
 ('help','Shows a list of available items.'),
-('syntax',"Shows syntax information for specified item. USE: syntax('example');"),
+('syntax',"Shows syntax information for specified item. USE: CALL syntax('example');"),
 ('views','Shows a list of views in the currently selected database'),
 ('all_views','Shows a list of all the views ordered by database'),
-('tables','Shows a formatted list of all the tables in the currently selected database')
+('tables','Shows a formatted list of all the tables in the currently selected database'),
+('formatInt','Formats integer to fixed with. USE: SELECT formatInt(42);'),
+('formatSize','Formats integer file size. e.g. SELECT formatSize(1028); prints 1.004 KiB')
 ;
 
 CREATE VIEW `version` AS
