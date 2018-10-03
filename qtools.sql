@@ -54,18 +54,25 @@ VALUES
 
 CREATE TABLE `syntax` (
 	`subject` CHAR(50) NOT NULL PRIMARY KEY,
+	`type` SET('FUNCTION','VIEW','PROCEDURE') NOT NULL DEFAULT 'VIEW',
 	`help` CHAR(200) NOT NULL
 ) ENGINE=MYISAM CHARACTER SET=ascii
 ;
 
-INSERT INTO `syntax` (`subject`,`help`)
+INSERT INTO `syntax` (`subject`,`type`,`help`)
 VALUES
-('version','Returns current version of qtools.'),
-('help','Shows a list of available items.'),
-('syntax',"Shows syntax information for specified item. USE: syntax('example');"),
-('views','Shows a list of views in the currently selected database'),
-('all_views','Shows a list of all the views ordered by database'),
-('tables','Shows a formatted list of all the tables in the currently selected database')
+('all_views','VIEW,PROCEDURE','Shows a list of all the views ordered by database'),
+('all_tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in all the databases'),
+('formatInt','FUNCTION','Formats integer to fixed with. USE: SELECT formatInt(42);'),
+('formatSize','FUNCTION','Formats integer file size. e.g. SELECT formatSize(1028); prints 1.004 KiB'),
+('functions','PROCEDURE,VIEW','Shows a list of functions in the currently selected database. Procedure use CALL functions(schema)'),
+('help','VIEW,PROCEDURE','Shows a list of available qtools routines.'),
+('help_views','PROCEDURE','Shows a list of available qtools views'),
+('syntax','VIEW,PROCEDURE','Shows syntax information for specified item. Procedure use: CALL syntax(routine_name)'),
+('routines','VIEW,PROCEDURE','Shows a list of functions and procedures in the currently selected database'),
+('tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in the currently selected database. Procedure use: CALL tables(schema)'),
+('version','VIEW,PROCEDURE','Returns current version of qtools.'),
+('views','VIEW,PROCEDURE','Shows a list of views in the currently selected database. Procedure use: CALL views(schema)')
 ;
 
 CREATE VIEW `version` AS
@@ -85,7 +92,35 @@ CREATE VIEW `all_views` AS
  SELECT `TABLE_SCHEMA` AS `Database`,
         `TABLE_NAME`   AS `View`
  FROM `information_schema`.`views`
+ ORDER BY `TABLE_SCHEMA`
 ;
+
+CREATE VIEW `routines` AS
+ SELECT 
+	`ROUTINE_NAME` AS `Routine`,
+	`ROUTINE_TYPE` AS `Type`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`='','void',`DATA_TYPE`),' ',
+		`ROUTINE_NAME`,
+		'(',
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 ''
+		),
+		')'
+	) AS `Info` 
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_schema`=SCHEMA()
+ ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
+;
+
 
 CREATE VIEW `help` AS
  SELECT *
@@ -114,7 +149,7 @@ CREATE PROCEDURE syntax(strFunction CHAR(50))
     DETERMINISTIC
      SQL SECURITY INVOKER
 BEGIN
-	SELECT `help` FROM `q`.`syntax` WHERE `subject`=strFunction;
+	SELECT `help`,`type` FROM `q`.`syntax` WHERE `subject`=strFunction AND (`type` & 4 OR `type` & 1);
 END; ___
 
 CREATE PROCEDURE help()
@@ -124,7 +159,24 @@ CREATE PROCEDURE help()
     DETERMINISTIC
      SQL SECURITY INVOKER
 BEGIN
-	SELECT * FROM `q`.`help`;
+	SELECT 'Showing available routines. ' AS `Info` UNION
+	SELECT 'Some routines are also available as VIEW' AS `Info` UNION
+	SELECT 'See help for views with CALL help_views;' AS `Info`;
+
+	SELECT * FROM `q`.`help` WHERE `type` & 4 OR `type` & 1;
+END; ___
+
+CREATE PROCEDURE help_views()
+ COMMENT 'Produces a list with available qtools views'
+  LANGUAGE SQL
+   READS SQL DATA
+    DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+	SELECT 'Showing available views.' AS `Info` UNION
+	SELECT 'Some views are also available as routine' As `Info`;
+	
+	SELECT * FROM `q`.`help` WHERE `type` & 2;
 END; ___
 
 CREATE PROCEDURE all_views()
@@ -134,6 +186,15 @@ CREATE PROCEDURE all_views()
     NOT DETERMINISTIC
 BEGIN
 	SELECT * FROM `q`.`all_views`;
+END; ___
+
+CREATE PROCEDURE all_tables()
+ COMMENT 'Produces a formatted list of all tables across all databases'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+BEGIN
+	SELECT * FROM `q`.`all_tables`;
 END; ___
 
 CREATE FUNCTION formatInt(in_value DECIMAL)
@@ -208,10 +269,10 @@ BEGIN
 		
 	END IF;
 	
-	-- SET strOut=CONCAT(FORMAT(fltSize,3,(SELECT `value` FROM `q`.`qtools` WHERE `label`='locale')),' ',strUnit);
-
 	SET strOut=FORMAT(fltSize,3,(SELECT `value` FROM `q`.`qtools` WHERE `label`='locale'));
+	
 	SET strOut=IF(PAD_LENGTH < LENGTH(strOut),strOut,LPAD(strOut,PAD_LENGTH,' '));
+
 	SET strOut=CONCAT(strOut,' ',strUnit);
 	
 	return strOut;
@@ -230,7 +291,78 @@ CREATE VIEW `tables` AS
  FROM `information_schema`.`tables`
  WHERE `TABLE_SCHEMA`=SCHEMA() AND `TABLE_TYPE`='BASE TABLE'
  ORDER BY `DATA_LENGTH`+`INDEX_LENGTH` ASC,
-          `TABLE_NAME` ASC
+          `TABLE_NAME` ASC;
+___
+
+CREATE VIEW `all_tables` AS
+ SELECT `TABLE_SCHEMA` AS `database`,
+        `TABLE_NAME` AS `table`,
+        `ENGINE` AS `Type`,
+        `q`.formatInt(`TABLE_ROWS`) AS `Records`,
+        `q`.formatSize(`DATA_LENGTH`) AS `Data Size`,
+        `q`.formatSize(`INDEX_LENGTH`) AS `Index Size`,
+        `q`.formatSize(`INDEX_LENGTH`+`DATA_LENGTH`) AS `Total Size`,
+        `CREATE_TIME` AS `Created`,
+        `UPDATE_TIME` AS `Updated`,
+        `CHECK_TIME` AS `Checked`
+ FROM `information_schema`.`tables`
+ WHERE `TABLE_TYPE`='BASE TABLE'
+ ORDER BY `TABLE_SCHEMA` ASC, 
+		  `DATA_LENGTH`+`INDEX_LENGTH` ASC,
+          `TABLE_NAME` ASC;
+___
+
+CREATE PROCEDURE tables( in_table_schema CHAR(200))
+ COMMENT 'Shows a formatted list of all the tables in the specified database schema'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+  SET @Theschema=in_table_schema;
+  SET @theQuery=CONCAT("
+  SELECT `TABLE_NAME` AS `Table in ",@Theschema,"`,
+        `ENGINE` AS `Type`,
+        `q`.formatInt(`TABLE_ROWS`) AS `Records`,
+        `q`.formatSize(`DATA_LENGTH`) AS `Data Size`,
+        `q`.formatSize(`INDEX_LENGTH`) AS `Index Size`,
+        `q`.formatSize(`INDEX_LENGTH`+`DATA_LENGTH`) AS `Total Size`,
+        `CREATE_TIME` AS `Created`,
+        `UPDATE_TIME` AS `Updated`,
+        `CHECK_TIME` AS `Checked`
+ FROM `information_schema`.`tables`
+ WHERE `TABLE_SCHEMA`=? AND `TABLE_TYPE`='BASE TABLE'
+ ORDER BY `DATA_LENGTH`+`INDEX_LENGTH` ASC,
+ `TABLE_NAME` ASC;");
+ 
+ PREPARE stmttables FROM @theQuery;
+ EXECUTE stmttables USING @Theschema;
+ DEALLOCATE PREPARE stmttables;
+ SET @Theschema=NULL;
+ SET @theQuery=NULL;
+END;
+___
+
+CREATE PROCEDURE views( in_view_schema CHAR(200))
+ COMMENT 'Shows a formatted list of all the tables in the specified database schema'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+ DECLARE theQuery TEXT DEFAULT NULL;
+ SET @Theschema=in_view_schema;
+ SET @theQuery=CONCAT("
+ SELECT `TABLE_NAME` AS `View in ",@Theschema,"` 
+ FROM `information_schema`.`views`   
+ WHERE `TABLE_SCHEMA`=?");
+ 
+ PREPARE stmtview FROM @theQuery;
+ EXECUTE stmtview USING @Theschema;
+ DEALLOCATE PREPARE stmtview;
+ SET @Theschema=NULL;
+ SET @theQuery=NULL;
+END;
 ___
 
 CREATE PROCEDURE qtools_install_finished()
@@ -252,5 +384,3 @@ DROP PROCEDURE `q`.qtools_install_finished ___
 SELECT "Delimiter has been set to ;" AS `Info` ___
 
 DELIMITER ;
-
-
