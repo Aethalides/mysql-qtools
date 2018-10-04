@@ -61,13 +61,16 @@ CREATE TABLE `syntax` (
 
 INSERT INTO `syntax` (`subject`,`type`,`help`)
 VALUES
+('all_functions','VIEW,PROCEDURE','Shows a list of all the functions across all databases'),
 ('all_views','VIEW,PROCEDURE','Shows a list of all the views ordered by database'),
+('all_procedures','VIEW,PROCEDURE','Shows a list of all the procedures across all databases'),
 ('all_tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in all the databases'),
 ('formatInt','FUNCTION','Formats integer to fixed with. USE: SELECT formatInt(42);'),
 ('formatSize','FUNCTION','Formats integer file size. e.g. SELECT formatSize(1028); prints 1.004 KiB'),
 ('functions','PROCEDURE,VIEW','Shows a list of functions in the currently selected database. Procedure use CALL functions(schema)'),
 ('help','VIEW,PROCEDURE','Shows a list of available qtools routines.'),
 ('help_views','PROCEDURE','Shows a list of available qtools views'),
+('procedures','PROCEDURE,VIEW','Shows a list available procedures in the database. Procedure use CALL procedures(schema)'),
 ('syntax','VIEW,PROCEDURE','Shows syntax information for specified item. Procedure use: CALL syntax(routine_name)'),
 ('routines','VIEW,PROCEDURE','Shows a list of functions and procedures in the currently selected database'),
 ('tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in the currently selected database. Procedure use: CALL tables(schema)'),
@@ -75,33 +78,31 @@ VALUES
 ('views','VIEW,PROCEDURE','Shows a list of views in the currently selected database. Procedure use: CALL views(schema)')
 ;
 
-CREATE VIEW `version` AS
+CREATE SQL SECURITY INVOKER VIEW `version` AS
  SELECT CONCAT('mysql-qtools version ',`value`) AS `version`
  FROM `q`.`qtools`
  WHERE `label`='version'
  LIMIT 1
 ;
 
-CREATE VIEW `views` AS
+CREATE SQL SECURITY INVOKER VIEW `views` AS
  SELECT `TABLE_NAME` AS `Views`
  FROM `information_schema`.`views`
  WHERE `TABLE_SCHEMA`=SCHEMA()
 ;
 
-CREATE VIEW `all_views` AS
+CREATE SQL SECURITY INVOKER VIEW `all_views` AS
  SELECT `TABLE_SCHEMA` AS `Database`,
         `TABLE_NAME`   AS `View`
  FROM `information_schema`.`views`
  ORDER BY `TABLE_SCHEMA`
 ;
 
-CREATE VIEW `routines` AS
+CREATE SQL SECURITY INVOKER VIEW `procedures` AS
  SELECT 
-	`ROUTINE_NAME` AS `Routine`,
-	`ROUTINE_TYPE` AS `Type`,
+	`ROUTINE_NAME` AS `Procedure`,
 	CONCAT
 	(
-		IF(`DATA_TYPE`='','void',`DATA_TYPE`),' ',
 		`ROUTINE_NAME`,
 		'(',
 		COALESCE
@@ -112,17 +113,152 @@ CREATE VIEW `routines` AS
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
-		 ''
+		 'void'
 		),
 		')'
-	) AS `Info` 
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_type`='PROCEDURE' AND `routine_schema`=SCHEMA()
+ ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
+;
+
+CREATE SQL SECURITY INVOKER VIEW `functions` AS
+ SELECT 
+	`ROUTINE_NAME` AS `Function`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`='','void',UPPER(`DATA_TYPE`)),' ',
+		`ROUTINE_NAME`,
+		'(',
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 'void'
+		),
+		')'
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_schema`=SCHEMA() AND `routine_type`='FUNCTION'
+ ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
+;
+
+CREATE SQL SECURITY INVOKER VIEW `all_functions` AS
+ SELECT 
+	`ROUTINE_NAME` AS `Function`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`='','void',UPPER(`DATA_TYPE`)),' ',
+		`ROUTINE_NAME`,
+		'(',
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 'void'
+		),
+		')'
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_type`='FUNCTION'
+ ORDER BY `ROUTINE_SCHEMA` ASC,`ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
+;
+
+CREATE SQL SECURITY INVOKER VIEW `all_procedures` AS
+ SELECT 
+	`ROUTINE_SCHEMA` AS `Database`,
+	`ROUTINE_NAME` AS `Procedure`,
+	CONCAT
+	(
+		`ROUTINE_NAME`,
+		'(',
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 'void'
+		),
+		')'
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_type`='PROCEDURE'
+ ORDER BY `ROUTINE_SCHEMA`,`ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
+;
+
+CREATE SQL SECURITY INVOKER VIEW `routines` AS
+ SELECT 
+	`ROUTINE_NAME` AS `Routine`,
+	`ROUTINE_TYPE` AS `Type`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`='','void',UPPER(`DATA_TYPE`)),' ',
+		`ROUTINE_NAME`,
+		'(',
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 'void'
+		),
+		')'
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
  FROM `information_schema`.`routines` as rou
  WHERE `routine_schema`=SCHEMA()
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
 ;
 
+CREATE SQL SECURITY INVOKER VIEW `all_routines` AS
+ SELECT 
+	`ROUTINE_SCHEMA` AS `Database`,
+	`ROUTINE_NAME` AS `Routine`,
+	`ROUTINE_TYPE` AS `Type`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`='','void',UPPER(`DATA_TYPE`)),' ',
+		`ROUTINE_NAME`,
+		'(',
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 'void'
+		),
+		')'
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ ORDER BY 
+	`ROUTINE_SCHEMA` ASC,
+	`ROUTINE_TYPE` ASC, 
+	`ROUTINE_NAME` ASC
+;
 
-CREATE VIEW `help` AS
+CREATE SQL SECURITY INVOKER VIEW `help` AS
  SELECT *
  FROM `q`.`syntax`
  ORDER BY `subject`
@@ -195,6 +331,33 @@ CREATE PROCEDURE all_tables()
     NOT DETERMINISTIC
 BEGIN
 	SELECT * FROM `q`.`all_tables`;
+END; ___
+
+CREATE PROCEDURE all_functions()
+ COMMENT 'Produces an ordered list of available functions across all databases'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+BEGIN
+	SELECT * FROM `q`.`all_functions`;
+END; ___
+
+CREATE PROCEDURE all_routines()
+ COMMENT 'Shows a list of all functions and procedures across all databases'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+BEGIN
+	SELECT * FROM `q`.`all_routines`;
+END; ___
+
+CREATE PROCEDURE all_procedures()
+ COMMENT 'Shows a list of all procedures across all databases'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+BEGIN
+	SELECT * FROM `q`.`all_procedures`;
 END; ___
 
 CREATE FUNCTION formatInt(in_value DECIMAL)
@@ -278,7 +441,7 @@ BEGIN
 	return strOut;
 END; ___
 
-CREATE VIEW `tables` AS
+CREATE SQL SECURITY INVOKER VIEW `tables` AS
  SELECT `TABLE_NAME` AS `table`,
         `ENGINE` AS `Type`,
         `q`.formatInt(`TABLE_ROWS`) AS `Records`,
@@ -294,7 +457,7 @@ CREATE VIEW `tables` AS
           `TABLE_NAME` ASC;
 ___
 
-CREATE VIEW `all_tables` AS
+CREATE SQL SECURITY INVOKER VIEW `all_tables` AS
  SELECT `TABLE_SCHEMA` AS `database`,
         `TABLE_NAME` AS `table`,
         `ENGINE` AS `Type`,
@@ -338,6 +501,133 @@ BEGIN
  PREPARE stmttables FROM @theQuery;
  EXECUTE stmttables USING @Theschema;
  DEALLOCATE PREPARE stmttables;
+ SET @Theschema=NULL;
+ SET @theQuery=NULL;
+END;
+___
+
+CREATE PROCEDURE procedures( in_schema CHAR(200) )
+ COMMENT 'Shows a list of all available procedures in the specified database'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+ DECLARE theQuery TEXT DEFAULT NULL;
+ SET @Theschema=in_schema;
+ SET @theQuery=CONCAT('
+ SELECT 
+	`ROUTINE_NAME` AS `Procedure in ',@Theschema,'`,
+	CONCAT
+	(
+		`ROUTINE_NAME`,
+		"(",
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 "void"
+		),
+		")"
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_type`="PROCEDURE" AND `routine_schema`=?
+ ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC;');
+ 
+ PREPARE stmtview FROM @theQuery;
+ EXECUTE stmtview USING @Theschema;
+ DEALLOCATE PREPARE stmtview;
+ SET @Theschema=NULL;
+ SET @theQuery=NULL; 
+ 
+END;
+___
+
+CREATE PROCEDURE functions( in_schema CHAR(200) )
+ COMMENT 'Shows a list of all available functions in the specified database'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+ DECLARE theQuery TEXT DEFAULT NULL;
+ SET @Theschema=in_schema;
+ SET @theQuery=CONCAT('
+ SELECT 
+	`ROUTINE_NAME` AS `Function in ',@Theschema,'`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`="","void",UPPER(`DATA_TYPE`))," ",
+		`ROUTINE_NAME`,
+		"(",
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 "void"
+		),
+		")"
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_type`="FUNCTION" AND `routine_schema`=?
+ ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC;');
+ 
+ PREPARE stmtview FROM @theQuery;
+ EXECUTE stmtview USING @Theschema;
+ DEALLOCATE PREPARE stmtview;
+ SET @Theschema=NULL;
+ SET @theQuery=NULL; 
+ 
+END;
+
+CREATE PROCEDURE routines( in_routine_schema CHAR(200))
+ COMMENT 'Shows a list of all available functions and procedures in the specified database'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+ DECLARE theQuery TEXT DEFAULT NULL;
+ SET @Theschema=in_routine_schema;
+ SET @theQuery=CONCAT('
+ SELECT 
+	`ROUTINE_NAME` AS `Routine in ',@Theschema,'`,
+	`ROUTINE_TYPE` AS `Type`,
+	CONCAT
+	(
+		IF(`DATA_TYPE`="","void",UPPER(`DATA_TYPE`))," ",
+		`ROUTINE_NAME`,
+		"(",
+		COALESCE
+		(
+		 (
+			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
+			FROM `information_schema`.`parameters` `par`
+			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
+			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
+		 ),
+		 "void"
+		),
+		")"
+	) AS `Info`,
+	`ROUTINE_COMMENT` AS `Comment`
+ FROM `information_schema`.`routines` as rou
+ WHERE `routine_schema`=?
+ ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC;');
+ 
+ PREPARE stmtview FROM @theQuery;
+ EXECUTE stmtview USING @Theschema;
+ DEALLOCATE PREPARE stmtview;
  SET @Theschema=NULL;
  SET @theQuery=NULL;
 END;
