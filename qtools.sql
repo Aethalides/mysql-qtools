@@ -87,15 +87,35 @@ CREATE SQL SECURITY INVOKER VIEW `version` AS
 
 CREATE SQL SECURITY INVOKER VIEW `views` AS
  SELECT `TABLE_NAME` AS `Views`
- FROM `information_schema`.`views`
+ FROM `INFORMATION_SCHEMA`.`views`
  WHERE `TABLE_SCHEMA`=SCHEMA()
 ;
 
 CREATE SQL SECURITY INVOKER VIEW `all_views` AS
  SELECT `TABLE_SCHEMA` AS `Database`,
         `TABLE_NAME`   AS `View`
- FROM `information_schema`.`views`
+ FROM `INFORMATION_SCHEMA`.`views`
  ORDER BY `TABLE_SCHEMA`
+;
+
+CREATE SQL SECURITY INVOKER VIEW `all_events` AS
+ SELECT `EVENT_SCHEMA` AS `Database`,
+        `EVENT_NAME` AS `Event`,
+        `EVENT_TYPE` AS `Type`,
+        `STATUS` AS `Status`,
+        IF
+        (
+         CONCAT(IFNULL(STARTS,'>'),IFNULL(ENDS,'>'))
+         ='>>',
+		 '---',
+		 CONCAT_WS
+		 ( ' ', `STARTS`, '->', IFNULL ( `ENDS`, '[Forever]' ) )
+	    ) AS `Lifetime`,
+	    COALESCE(`LAST_EXECUTED`,'[Never]') AS `Last Executed`,
+	    EXECUTE_AT,
+	    CONCAT_WS(' ',`INTERVAL_VALUE`,`INTERVAL_FIELD`) AS `Interval` 
+ FROM `INFORMATION_SCHEMA`.`EVENTS` 
+ ORDER BY `EVENT_SCHEMA` ASC
 ;
 
 CREATE SQL SECURITY INVOKER VIEW `procedures` AS
@@ -109,7 +129,7 @@ CREATE SQL SECURITY INVOKER VIEW `procedures` AS
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -118,7 +138,7 @@ CREATE SQL SECURITY INVOKER VIEW `procedures` AS
 		')'
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_type`='PROCEDURE' AND `routine_schema`=SCHEMA()
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
 ;
@@ -135,7 +155,7 @@ CREATE SQL SECURITY INVOKER VIEW `functions` AS
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -144,7 +164,7 @@ CREATE SQL SECURITY INVOKER VIEW `functions` AS
 		')'
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_schema`=SCHEMA() AND `routine_type`='FUNCTION'
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
 ;
@@ -161,7 +181,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_functions` AS
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -170,7 +190,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_functions` AS
 		')'
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_type`='FUNCTION'
  ORDER BY `ROUTINE_SCHEMA` ASC,`ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
 ;
@@ -187,7 +207,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_procedures` AS
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -196,7 +216,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_procedures` AS
 		')'
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_type`='PROCEDURE'
  ORDER BY `ROUTINE_SCHEMA`,`ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
 ;
@@ -214,7 +234,7 @@ CREATE SQL SECURITY INVOKER VIEW `routines` AS
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -223,7 +243,7 @@ CREATE SQL SECURITY INVOKER VIEW `routines` AS
 		')'
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_schema`=SCHEMA()
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC
 ;
@@ -242,7 +262,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_routines` AS
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -251,7 +271,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_routines` AS
 		')'
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  ORDER BY 
 	`ROUTINE_SCHEMA` ASC,
 	`ROUTINE_TYPE` ASC, 
@@ -361,7 +381,7 @@ BEGIN
 END; ___
 
 CREATE FUNCTION formatInt(in_value DECIMAL)
- RETURNS CHAR(15)
+ RETURNS TEXT
   CHARSET ascii
    COMMENT 'Formats an integer according to defined locale'
     LANGUAGE SQL
@@ -379,13 +399,13 @@ BEGIN
 	   WHERE `label`='locale'
 	  )
 	 ),
-	 15,
+	 9,
 	 ' '
 	)
     ;
 END; ___
 
-CREATE function formatSize(intSize BIGINT(20) UNSIGNED)
+CREATE FUNCTION formatSize(intSize BIGINT(20) UNSIGNED)
  RETURNS CHAR(15)
   CHARSET ascii
    COMMENT 'Formats a file size according to chosen SI prefix'
@@ -441,6 +461,139 @@ BEGIN
 	return strOut;
 END; ___
 
+CREATE FUNCTION substr_count(
+	haystack TEXT CHARSET ascii,
+	needle TEXT CHARSET ascii
+) RETURNS SMALLINT(3) UNSIGNED
+    COMMENT "Count the number of substring occurrences (not case sensitive)"
+     LANGUAGE SQL
+      CONTAINS SQL
+       DETERMINISTIC
+BEGIN
+	DECLARE beginCount INT(11) UNSIGNED DEFAULT CHAR_LENGTH(haystack);
+	DECLARE replaced TEXT DEFAULT REPLACE(haystack,needle,'');
+	RETURN beginCount-CHAR_LENGTH(replaced);
+END; ___
+
+CREATE FUNCTION formatDoubleCompoundTime(
+	inEvery VARCHAR(256),
+	unitName VARCHAR(18),
+	firstUnitSingle  VARCHAR(18), firstUnitMulti VARCHAR(18),
+	secondUnitSingle VARCHAR(18),secondUnitMulti VARCHAR(18)
+)
+ RETURNS TEXT
+   CHARSET ascii
+    COMMENT 'Human readable format of MINUTE_SECOND time format'
+     LANGUAGE SQL
+      READS SQL DATA
+       DETERMINISTIC
+BEGIN
+	DECLARE cpos SMALLINT(1) UNSIGNED DEFAULT LOCATE(':',inEvery);
+	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
+	DECLARE minutes SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM 1 FOR cpos-1);
+	DECLARE seconds SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM cpos+1);
+	DECLARE description TEXT CHARSET ascii DEFAULT NULL;
+	
+	IF(1<>ccount) THEN
+	
+		SET description=CONCAT("formatDoubleCompoundTime(): syntax error for ",unitName," value `",inEvery,"'");
+			SIGNAL SQLSTATE '45001' 
+			SET MESSAGE_TEXT=description;
+		
+	END IF;
+	
+	CASE minutes
+	
+		WHEN 0 THEN RETURN IF(1=seconds,CONCAT("Every ",secondUnitSingle),CONCAT("Every ",seconds," ",secondUnitMulti));
+		
+		WHEN 1 THEN RETURN IF(
+			
+			0=seconds,
+			
+			CONCAT("Every ",firstUnitSingle),
+			
+			IF(
+			
+				1=seconds,
+				
+				CONCAT("Every ",firstUnitSingle," and 1 ",secondUnitSingle),
+				
+				CONCAT("Every ",firstUnitSingle," and ",seconds," ",secondUnitMulti)
+			)
+		);
+		
+		ELSE RETURN IF(
+		
+			0=seconds,
+			
+			CONCAT("Every ",minutes," ",firstUnitMulti),
+			
+			IF(
+			
+				1=seconds,
+				
+				CONCAT("Every ",minutes," ",firstUnitMulti," and 1 ",secondUnitSingle),
+				
+				CONCAT("Every ",minutes," ",firstUnitMulti," and ", seconds," ", secondUnitMulti)
+			)
+		);
+		
+	END CASE;
+END; ___
+
+CREATE FUNCTION formatEventTime(
+	inTimeZone VARCHAR(64),inRecurring VARCHAR(9),
+	inStart DATETIME,inEnds DATETIME,
+	inEvery VARCHAR(256),inUnit VARCHAR(18)
+	
+) RETURNS TEXT
+   CHARSET ascii
+    COMMENT 'Human readable format of event lifetime and schedule'
+     LANGUAGE SQL
+      READS SQL DATA
+       DETERMINISTIC
+BEGIN
+	DECLARE description VARCHAR(256) DEFAULT '';
+	
+	IF inUnit IN ('SECOND','MINUTE','HOUR','DAY','WEEK','MONTH','QUARTER','YEAR') AND inEvery REGEXP '^[0-9]+$' = 0 THEN
+	
+		SIGNAL SQLSTATE '45001' 
+		SET MESSAGE_TEXT="formatEventTime() syntax error. inEvery parameter must be an integer for given inUnit parameter";
+
+	END IF;
+	
+	CASE inUnit
+
+		WHEN 'SECOND'   THEN SET description=IF(1=inEvery,"Every second",CONCAT("Every ",inEvery," seconds"));
+
+		WHEN 'MINUTE'   THEN SET description=IF(1=inEvery,"Every minute",CONCAT("Every ",inEvery," minutes"));
+
+		WHEN 'HOUR'     THEN SET description=IF(1=inEvery,"Hourly",CONCAT("Every ",inEvery," hours"));
+		
+		WHEN 'DAY'      THEN SET description=IF(1=inEvery,"Daily",CONCAT("Every ",inEvery," days"));
+		
+		WHEN 'WEEK'     THEN SET description=IF(1=inEvery,"Weekly",CONCAT("Every ",inEvery," weeks"));
+
+		WHEN 'MONTH'    THEN SET description=IF(1=inEvery,"Monthly",CONCAT("Every ",inEvery," months"));
+
+		WHEN 'QUARTER'  THEN SET description=IF(1=inEvery,"Quarterly",CONCAT("Every ",inEvery," quarters"));
+
+		WHEN 'YEAR'     THEN SET description=IF(1=inEvery,"Yearly",CONCAT("Every ",inEvery," years"));
+		
+		/* Special combined units */
+		
+		WHEN 'MINUTE_SECOND' THEN SET description=`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'minute','minutes','second','seconds');
+		
+		WHEN 'HOUR_MINUTE' THEN SET description=`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'hour','hours','minute','minutes');
+
+		WHEN 'DAY_HOUR' THEN SET description=`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'day','days','hour','hours');
+
+
+	END CASE;
+	
+	RETURN description;
+END; ___
+
 CREATE SQL SECURITY INVOKER VIEW `tables` AS
  SELECT `TABLE_NAME` AS `table`,
         `ENGINE` AS `Type`,
@@ -451,7 +604,7 @@ CREATE SQL SECURITY INVOKER VIEW `tables` AS
         `CREATE_TIME` AS `Created`,
         `UPDATE_TIME` AS `Updated`,
         `CHECK_TIME` AS `Checked`
- FROM `information_schema`.`tables`
+ FROM `INFORMATION_SCHEMA`.`tables`
  WHERE `TABLE_SCHEMA`=SCHEMA() AND `TABLE_TYPE`='BASE TABLE'
  ORDER BY `DATA_LENGTH`+`INDEX_LENGTH` ASC,
           `TABLE_NAME` ASC;
@@ -468,7 +621,7 @@ CREATE SQL SECURITY INVOKER VIEW `all_tables` AS
         `CREATE_TIME` AS `Created`,
         `UPDATE_TIME` AS `Updated`,
         `CHECK_TIME` AS `Checked`
- FROM `information_schema`.`tables`
+ FROM `INFORMATION_SCHEMA`.`tables`
  WHERE `TABLE_TYPE`='BASE TABLE'
  ORDER BY `TABLE_SCHEMA` ASC, 
 		  `DATA_LENGTH`+`INDEX_LENGTH` ASC,
@@ -493,7 +646,7 @@ BEGIN
         `CREATE_TIME` AS `Created`,
         `UPDATE_TIME` AS `Updated`,
         `CHECK_TIME` AS `Checked`
- FROM `information_schema`.`tables`
+ FROM `INFORMATION_SCHEMA`.`tables`
  WHERE `TABLE_SCHEMA`=? AND `TABLE_TYPE`='BASE TABLE'
  ORDER BY `DATA_LENGTH`+`INDEX_LENGTH` ASC,
  `TABLE_NAME` ASC;");
@@ -526,7 +679,7 @@ BEGIN
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -535,7 +688,7 @@ BEGIN
 		")"
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_type`="PROCEDURE" AND `routine_schema`=?
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC;');
  
@@ -569,7 +722,7 @@ BEGIN
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -578,7 +731,7 @@ BEGIN
 		")"
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_type`="FUNCTION" AND `routine_schema`=?
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC;');
  
@@ -612,7 +765,7 @@ BEGIN
 		(
 		 (
 			SELECT GROUP_CONCAT(`PARAMETER_NAME`) 
-			FROM `information_schema`.`parameters` `par`
+			FROM `INFORMATION_SCHEMA`.`parameters` `par`
 			WHERE `par`.`SPECIFIC_SCHEMA`=`rou`.`ROUTINE_SCHEMA`
 			AND `par`.`SPECIFIC_NAME`=`rou`.`ROUTINE_NAME`
 		 ),
@@ -621,7 +774,7 @@ BEGIN
 		")"
 	) AS `Info`,
 	`ROUTINE_COMMENT` AS `Comment`
- FROM `information_schema`.`routines` as rou
+ FROM `INFORMATION_SCHEMA`.`routines` as rou
  WHERE `routine_schema`=?
  ORDER BY `ROUTINE_TYPE` ASC, `ROUTINE_NAME` ASC;');
  
@@ -644,7 +797,7 @@ BEGIN
  SET @Theschema=in_view_schema;
  SET @theQuery=CONCAT("
  SELECT `TABLE_NAME` AS `View in ",@Theschema,"` 
- FROM `information_schema`.`views`   
+ FROM `INFORMATION_SCHEMA`.`views`   
  WHERE `TABLE_SCHEMA`=?");
  
  PREPARE stmtview FROM @theQuery;
