@@ -65,17 +65,19 @@ VALUES
 ('all_views','VIEW,PROCEDURE','Shows a list of all the views ordered by database'),
 ('all_procedures','VIEW,PROCEDURE','Shows a list of all the procedures across all databases'),
 ('all_tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in all the databases'),
+('all_events','VIEW,PROCEDURE','Shows a formatted list of all the events in all the databases'),
+('events','VIEW,PROCEDURE','Shows a formatted list of all the events in the currently selected database. Procedure use CALL q.events(schema)'),
 ('formatInt','FUNCTION','Formats integer to fixed with. USE: SELECT formatInt(42);'),
 ('formatSize','FUNCTION','Formats integer file size. e.g. SELECT formatSize(1028); prints 1.004 KiB'),
-('functions','PROCEDURE,VIEW','Shows a list of functions in the currently selected database. Procedure use CALL functions(schema)'),
+('functions','PROCEDURE,VIEW','Shows a list of functions in the currently selected database. Procedure use CALL q.functions(schema)'),
 ('help','VIEW,PROCEDURE','Shows a list of available qtools routines.'),
 ('help_views','PROCEDURE','Shows a list of available qtools views'),
-('procedures','PROCEDURE,VIEW','Shows a list available procedures in the database. Procedure use CALL procedures(schema)'),
-('syntax','VIEW,PROCEDURE','Shows syntax information for specified item. Procedure use: CALL syntax(routine_name)'),
+('procedures','PROCEDURE,VIEW','Shows a list available procedures in the database. Procedure use CALL q.procedures(schema)'),
+('syntax','VIEW,PROCEDURE','Shows syntax information for specified item. Procedure use: CALL q.syntax(routine_name)'),
 ('routines','VIEW,PROCEDURE','Shows a list of functions and procedures in the currently selected database'),
-('tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in the currently selected database. Procedure use: CALL tables(schema)'),
+('tables','VIEW,PROCEDURE','Shows a formatted list of all the tables in the currently selected database. Procedure use: CALL q.tables(schema)'),
 ('version','VIEW,PROCEDURE','Returns current version of qtools.'),
-('views','VIEW,PROCEDURE','Shows a list of views in the currently selected database. Procedure use: CALL views(schema)')
+('views','VIEW,PROCEDURE','Shows a list of views in the currently selected database. Procedure use: CALL q.views(schema)')
 ;
 
 CREATE SQL SECURITY INVOKER VIEW `version` AS
@@ -96,26 +98,6 @@ CREATE SQL SECURITY INVOKER VIEW `all_views` AS
         `TABLE_NAME`   AS `View`
  FROM `INFORMATION_SCHEMA`.`views`
  ORDER BY `TABLE_SCHEMA`
-;
-
-CREATE SQL SECURITY INVOKER VIEW `all_events` AS
- SELECT `EVENT_SCHEMA` AS `Database`,
-        `EVENT_NAME` AS `Event`,
-        `EVENT_TYPE` AS `Type`,
-        `STATUS` AS `Status`,
-        IF
-        (
-         CONCAT(IFNULL(STARTS,'>'),IFNULL(ENDS,'>'))
-         ='>>',
-		 '---',
-		 CONCAT_WS
-		 ( ' ', `STARTS`, '->', IFNULL ( `ENDS`, '[Forever]' ) )
-	    ) AS `Lifetime`,
-	    COALESCE(`LAST_EXECUTED`,'[Never]') AS `Last Executed`,
-	    EXECUTE_AT,
-	    CONCAT_WS(' ',`INTERVAL_VALUE`,`INTERVAL_FIELD`) AS `Interval` 
- FROM `INFORMATION_SCHEMA`.`EVENTS` 
- ORDER BY `EVENT_SCHEMA` ASC
 ;
 
 CREATE SQL SECURITY INVOKER VIEW `procedures` AS
@@ -472,77 +454,180 @@ CREATE FUNCTION substr_count(
 BEGIN
 	DECLARE beginCount INT(11) UNSIGNED DEFAULT CHAR_LENGTH(haystack);
 	DECLARE replaced TEXT DEFAULT REPLACE(haystack,needle,'');
-	RETURN beginCount-CHAR_LENGTH(replaced);
+	RETURN (beginCount-CHAR_LENGTH(replaced))/CHAR_LENGTH(needle);
+END; ___
+
+CREATE FUNCTION formatQuartetCompoundTime(
+	inEvery VARCHAR(256), unitName VARCHAR(18),
+	  unit1 VARCHAR(18), unit2 VARCHAR(18),
+	  unit3 VARCHAR(18), unit4 VARCHAR(18)
+) 
+ RETURNS TEXT
+  CHARSET ascii
+   COMMENT 'Human readable format of time quartets'
+    LANGUAGE SQL
+     READS SQL DATA
+      DETERMINISTIC
+BEGIN
+	DECLARE cpos SMALLINT(1) DEFAULT LOCATE(':',inEvery);
+	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
+	DECLARE unit1s SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM 1 FOR cpos-1);
+	DECLARE remainingUnits VARCHAR(18) DEFAULT SUBSTRING(inEvery FROM cpos+1);
+	DECLARE errorDescription TEXT CHARSET ascii DEFAULT NULL;
+	DECLARE trailingPart TEXT DEFAULT `q`.`formatTrippleCompoundTime`(
+		remainingUnits,unitName,unit2,unit3,unit4
+	);
+	
+	IF 1 = unit1s THEN
+	
+		IF trailingPart IS NULL THEN
+		
+			RETURN CONCAT("1 ",unit1);
+			
+		ELSE
+		
+			RETURN CONCAT("1 ", unit1s," and ",trailingPart);
+			
+		END IF;
+	
+	ELSE
+	
+		IF trailingPart IS NULL THEN
+		
+			RETURN CONCAT(unit1s," ",unit1,'s');
+			
+		ELSE
+		
+			RETURN CONCAT(unit1s," ",unit1,"s and ",trailingPart);
+			
+		END IF;
+	END IF;
+	
+	RETURN NULL;
+END;
+
+CREATE FUNCTION formatTrippleCompoundTime(
+	inEvery VARCHAR(256),unitName VARCHAR(18),unit1 VARCHAR(18),
+	unit2 VARCHAR(18), unit3 VARCHAR(18)
+) 
+ RETURNS TEXT
+  CHARSET ascii
+   COMMENT 'Human readable format of time trios'
+    LANGUAGE SQL
+     READS SQL DATA
+      DETERMINISTIC
+BEGIN
+	DECLARE cpos SMALLINT(1) DEFAULT LOCATE(':',inEvery);
+	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
+	DECLARE unit1s SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM 1 FOR cpos-1);
+	DECLARE remainingUnits VARCHAR(18) DEFAULT SUBSTRING(inEvery FROM cpos+1);
+	DECLARE errorDescription TEXT CHARSET ascii DEFAULT NULL;
+	DECLARE trailingPart TEXT DEFAULT `q`.`formatDoubleCompoundTime`(
+		remainingUnits,unitName, unit2,unit3
+	);
+	
+	IF 1 = unit1s THEN
+	
+		IF trailingPart IS NULL THEN
+		
+			RETURN CONCAT("1 ",unit1);
+			
+		ELSE
+		
+			RETURN CONCAT("1 ", unit1," and ",trailingPart);
+			
+		END IF;
+	
+	ELSE
+	
+		IF trailingPart IS NULL THEN
+		
+			RETURN CONCAT(unit1s," ",unit1,'s');
+			
+		ELSE
+		
+			RETURN CONCAT(unit1s," ",unit1,'s'," and ",trailingPart);
+		END IF;
+	END IF;
+	
+	RETURN NULL;
 END; ___
 
 CREATE FUNCTION formatDoubleCompoundTime(
-	inEvery VARCHAR(256),
-	unitName VARCHAR(18),
-	firstUnitSingle  VARCHAR(18), firstUnitMulti VARCHAR(18),
-	secondUnitSingle VARCHAR(18),secondUnitMulti VARCHAR(18)
+	inEvery VARCHAR(256), unitName VARCHAR(18),
+	unit1 VARCHAR(18), unit2 VARCHAR(18)
 )
  RETURNS TEXT
    CHARSET ascii
-    COMMENT 'Human readable format of MINUTE_SECOND time format'
+    COMMENT 'Human readable format of time duets'
      LANGUAGE SQL
       READS SQL DATA
        DETERMINISTIC
 BEGIN
-	DECLARE cpos SMALLINT(1) UNSIGNED DEFAULT LOCATE(':',inEvery);
+	DECLARE cpos SMALLINT(1) DEFAULT LOCATE(':',inEvery);
 	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
-	DECLARE minutes SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM 1 FOR cpos-1);
-	DECLARE seconds SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM cpos+1);
+	DECLARE firstunits SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM 1 FOR cpos-1);
+	DECLARE secondunits SMALLINT(1) UNSIGNED DEFAULT SUBSTRING(inEvery FROM cpos+1);
 	DECLARE description TEXT CHARSET ascii DEFAULT NULL;
 	
 	IF(1<>ccount) THEN
 	
-		SET description=CONCAT("formatDoubleCompoundTime(): syntax error for ",unitName," value `",inEvery,"'");
+		SET description=CONCAT("formatDoubleCompoundTime(): syntax error for ",unitName," value `",inEvery,"', expected 1 occurence of ':', got ",ccount);
 			SIGNAL SQLSTATE '45001' 
 			SET MESSAGE_TEXT=description;
 		
 	END IF;
 	
-	CASE minutes
+	CASE firstunits
 	
-		WHEN 0 THEN RETURN IF(1=seconds,CONCAT("Every ",secondUnitSingle),CONCAT("Every ",seconds," ",secondUnitMulti));
+		WHEN 0 THEN RETURN IF
+		(
+			0=secondunits,NULL,
+			IF
+			(
+				1=secondunits,CONCAT("1 ",unit2),CONCAT(secondunits," ",unit2,'s')
+			)
+		);
 		
 		WHEN 1 THEN RETURN IF(
 			
-			0=seconds,
+			0=secondunits,
 			
-			CONCAT("Every ",firstUnitSingle),
+			unit1,
 			
 			IF(
 			
-				1=seconds,
+				1=secondunits,
 				
-				CONCAT("Every ",firstUnitSingle," and 1 ",secondUnitSingle),
+				CONCAT("1 ",unit1," and 1 ",unit2),
 				
-				CONCAT("Every ",firstUnitSingle," and ",seconds," ",secondUnitMulti)
+				CONCAT("1 ",unit1," and ",secondunits," ",unit2,'s')
 			)
 		);
 		
 		ELSE RETURN IF(
 		
-			0=seconds,
+			0=secondunits,
 			
-			CONCAT("Every ",minutes," ",firstUnitMulti),
+			CONCAT(firstunits," ",unit1,'s'),
 			
 			IF(
 			
-				1=seconds,
+				1=secondunits,
 				
-				CONCAT("Every ",minutes," ",firstUnitMulti," and 1 ",secondUnitSingle),
+				CONCAT(firstunits," ",unit1,'s'," and 1 ",unit2),
 				
-				CONCAT("Every ",minutes," ",firstUnitMulti," and ", seconds," ", secondUnitMulti)
+				CONCAT(firstunits," ",unit1,'s'," and ", secondunits," ", unit2,'s')
 			)
 		);
 		
 	END CASE;
 END; ___
 
+create table yourmom (message text) ENGINE=MyISAM; ___
+
 CREATE FUNCTION formatEventTime(
-	inTimeZone VARCHAR(64),inRecurring VARCHAR(9),
+	inTimeZone VARCHAR(64),inAt DATETIME,
 	inStart DATETIME,inEnds DATETIME,
 	inEvery VARCHAR(256),inUnit VARCHAR(18)
 	
@@ -555,6 +640,8 @@ CREATE FUNCTION formatEventTime(
 BEGIN
 	DECLARE description VARCHAR(256) DEFAULT '';
 	
+	SET inEvery=REPLACE(inEvery,"'","");
+	
 	IF inUnit IN ('SECOND','MINUTE','HOUR','DAY','WEEK','MONTH','QUARTER','YEAR') AND inEvery REGEXP '^[0-9]+$' = 0 THEN
 	
 		SIGNAL SQLSTATE '45001' 
@@ -562,34 +649,155 @@ BEGIN
 
 	END IF;
 	
-	CASE inUnit
-
-		WHEN 'SECOND'   THEN SET description=IF(1=inEvery,"Every second",CONCAT("Every ",inEvery," seconds"));
-
-		WHEN 'MINUTE'   THEN SET description=IF(1=inEvery,"Every minute",CONCAT("Every ",inEvery," minutes"));
-
-		WHEN 'HOUR'     THEN SET description=IF(1=inEvery,"Hourly",CONCAT("Every ",inEvery," hours"));
+	IF inEvery IS NULL THEN
+	
+		SET description=CONCAT("Once at ",inAT,IF("SYSTEM"=inTimeZone,"",CONCAT(" (",inTimeZone,")")));
 		
-		WHEN 'DAY'      THEN SET description=IF(1=inEvery,"Daily",CONCAT("Every ",inEvery," days"));
+	ELSE
+	
+		CASE inUnit
+
+			WHEN 'SECOND'   THEN SET description=IF(1=inEvery,"Every second",CONCAT("Every ",inEvery," seconds"));
+
+			WHEN 'MINUTE'   THEN SET description=IF(1=inEvery,"Every minute",CONCAT("Every ",inEvery," minutes"));
+
+			WHEN 'HOUR'     THEN SET description=IF(1=inEvery,"Hourly",CONCAT("Every ",inEvery," hours"));
+			
+			WHEN 'DAY'      THEN SET description=IF(1=inEvery,"Daily",CONCAT("Every ",inEvery," days"));
+			
+			WHEN 'WEEK'     THEN SET description=IF(1=inEvery,"Weekly",CONCAT("Every ",inEvery," weeks"));
+
+			WHEN 'MONTH'    THEN SET description=IF(1=inEvery,"Monthly",CONCAT("Every ",inEvery," months"));
+
+			WHEN 'QUARTER'  THEN SET description=IF(1=inEvery,"Quarterly",CONCAT("Every ",inEvery," quarters"));
+
+			WHEN 'YEAR'     THEN SET description=IF(1=inEvery,"Yearly",CONCAT("Every ",inEvery," years"));
+			
+			/* duets */
+			
+			WHEN 'MINUTE_SECOND' THEN SET description=CONCAT
+			(
+				"Every ",
+				
+				`q`.`formatDoubleCompoundTime`
+				(
+					inEvery,inUnit,'minute','minutes','second','seconds'
+				)
+			);
+			
+			WHEN 'HOUR_MINUTE' THEN SET description=CONCAT("Every ",`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'hour','minute'));
+
+			WHEN 'DAY_HOUR' THEN SET description=CONCAT("Every ",`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'day','hour'));
+
+
+			/* trios */
+			
+			WHEN 'HOUR_SECOND' THEN set description=CONCAT
+			(
+				"Every ",
+				
+				`q`.`formatTrippleCompoundTime`
+				(
+					inEvery,inUnit,'hour','minute','second'
+				)
+			);
+			
+			WHEN 'DAY_MINUTE' THEN set description=CONCAT
+			(
+			
+				"Every ",
+				
+				`q`.`formatTrippleCompoundTime`
+				(
+				
+					REPLACE(inEvery,' ',':'),inUnit,
+					
+					'day','hour','minute'
+				)
+			);
+			
+			/* quartets */
+			
+			WHEN 'DAY_SECOND' THEN SET description=CONCAT
+			(
+			
+				"Every ",
+				
+				`q`.`formatQuartetCompoundTime`
+				(
+				
+					REPLACE(inEvery,' ',':'),inUnit,
+					
+					'day','hour','minute','second'
+				)
+			);
+			
+		END CASE;
+	
+		SET description=REPLACE(REPLACE(description,"Every 1 day and","Daily, every"),"every 1 hour and","every hour,");
 		
-		WHEN 'WEEK'     THEN SET description=IF(1=inEvery,"Weekly",CONCAT("Every ",inEvery," weeks"));
-
-		WHEN 'MONTH'    THEN SET description=IF(1=inEvery,"Monthly",CONCAT("Every ",inEvery," months"));
-
-		WHEN 'QUARTER'  THEN SET description=IF(1=inEvery,"Quarterly",CONCAT("Every ",inEvery," quarters"));
-
-		WHEN 'YEAR'     THEN SET description=IF(1=inEvery,"Yearly",CONCAT("Every ",inEvery," years"));
+		IF 1<q.substr_count(description," and ") THEN
 		
-		/* Special combined units */
+			/* replace descriptions like "2 days and 2 hours and 5 minutes and 6 seconds
+				into 2 days, 2 hours, 5 minutes, and 6 seconds */
+
+			-- first step for this process is to replace *all* the "AND" instances with comma space
+			
+			SET description=REPLACE
+			(
+				description," and ", ", "
+			);
+			
+			/* next is to reverse the text and get the position of the first comma 
+				(which is actually the position of the last comma on the un-reversed text),
+			    then insert ", and" on that position and Robert is your mother's brother */
+				
+			SET description=INSERT
+			(
+				description,
+				
+				LENGTH(description)-LOCATE(',',REVERSE(description))+1,
+				
+				1,
+				
+				", and"
+			);
+			
+			-- tack on start & end times if relevant 
+
+			IF NOT inStart IS NULL THEN
 		
-		WHEN 'MINUTE_SECOND' THEN SET description=`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'minute','minutes','second','seconds');
+				SET description=CONCAT(description,". From ",inStart);
+			
+			END IF;
 		
-		WHEN 'HOUR_MINUTE' THEN SET description=`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'hour','hours','minute','minutes');
-
-		WHEN 'DAY_HOUR' THEN SET description=`q`.`formatDoubleCompoundTime`(inEvery,inUnit,'day','days','hour','hours');
-
-
-	END CASE;
+			IF NOT inEnds IS NULL THEN
+			
+				SET description=CONCAT
+				(
+					description,
+					
+					IF(inStart IS NULL,". Until "," until "),
+					
+					inEnds
+				);
+			END IF;
+			
+			-- and add timezone info if relevant
+			
+			IF (NOT inStart IS NULL OR NOT inEnds IS NULL) AND 'SYSTEM' != inTimeZone THEN
+			
+				SET description=CONCAT(
+				
+					description,
+					
+					CONCAT(" (",inTimeZone,")")
+				);
+				
+			END IF;
+		END IF;
+		
+	END IF;
 	
 	RETURN description;
 END; ___
@@ -807,6 +1015,62 @@ BEGIN
  SET @theQuery=NULL;
 END;
 ___
+
+CREATE PROCEDURE events ( in_event_schema CHAR(200))
+ COMMENT 'Shows a formatted list of all the events in the specified database schema'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+ DECLARE theQuery TEXT DEFAULT NULL;
+ SET @Theschema=in_event_schema;
+ SET @theQuery=CONCAT("
+  SELECT `EVENT_NAME` AS `Event in ",@Theschema,"`,
+   REPLACE(REPLACE(`STATUS`,'DISABLED','Disabled'),'ENABLED','Enabled') AS `Status`,
+	`q`.`formatEventTime`(`TIME_ZONE`,`EXECUTE_AT`,`STARTS`,`ENDS`,`INTERVAL_VALUE`,`INTERVAL_FIELD`) AS `Lifetime`,
+  COALESCE(`LAST_EXECUTED`,'Never') AS `Last run`
+  FROM `INFORMATION_SCHEMA`.`EVENTS`
+  WHERE `EVENT_SCHEMA`=?;
+ ");
+ PREPARE stmtview FROM @theQuery;
+ EXECUTE stmtview USING @Theschema;
+ DEALLOCATE PREPARE stmtview;
+ SET @Theschema=NULL;
+ SET @theQuery=NULL;
+END;
+___
+
+CREATE PROCEDURE all_events ()
+ COMMENT 'Shows a formatted list of all events across all database schemas'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+	SELECT * FROM `q`.`all_events`;
+END;
+___
+
+CREATE SQL SECURITY INVOKER VIEW `all_events` AS
+ SELECT `EVENT_SCHEMA` AS `Database`,
+        `EVENT_NAME` AS `Event`,
+        REPLACE(REPLACE(`STATUS`,'DISABLED','Disabled'),'ENABLED','Enabled') AS `Status`,
+        `q`.`formatEventTime`(`TIME_ZONE`,`EXECUTE_AT`,`STARTS`,`ENDS`,`INTERVAL_VALUE`,`INTERVAL_FIELD`) AS `Lifetime`,
+        COALESCE(`LAST_EXECUTED`,'Never') AS `Last run`
+ FROM `INFORMATION_SCHEMA`.`EVENTS` 
+ ORDER BY `EVENT_SCHEMA` ASC
+;___
+
+CREATE SQL SECURITY INVOKER VIEW `events` AS
+ SELECT `EVENT_NAME` AS `Event`,
+        REPLACE(REPLACE(`STATUS`,'DISABLED','Disabled'),'ENABLED','Enabled') AS `Status`,
+        `q`.`formatEventTime`(`TIME_ZONE`,`EXECUTE_AT`,`STARTS`,`ENDS`,`INTERVAL_VALUE`,`INTERVAL_FIELD`) AS `Lifetime`,
+        COALESCE(`LAST_EXECUTED`,'Never') AS `Last run`
+ FROM `INFORMATION_SCHEMA`.`EVENTS`
+ WHERE `EVENT_SCHEMA`=SCHEMA()
+;___
+
 
 CREATE PROCEDURE qtools_install_finished()
 BEGIN
