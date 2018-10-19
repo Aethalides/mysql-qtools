@@ -1,22 +1,49 @@
-# mysql-qtools
-A database with tools to use when exploring MySQL via its commandline client
+# Contents #
 
-## Installing ##
+[TOC]
 
-```SQL
+# Introduction#
+
+mysql-qtools are a set of views, functions, and procedures to improve the life of the DBA using the MySQL command-line client. It includes handy tools for viewing detailed information on tables, views, routines, events, processes, users, etc, all with a minimum of typing.
+
+# Installing #
+
+Fire up your MySQl command-line client, connect to the database server onto which you want to install the qtools, and issue the following command (providing you have saved the qtools.sql file to /tmp)
+
+```mysql
 source /tmp/qtools.sql
 ```
 
-All tools are used without switching to the q database. E.g. to view a list of views in the current database:
+# User manual
+
+## The basics
+
+There are usually several variants of each tool. For instance to view a list of all the views defined in the currently selected schema (e.g. if you have selected the test database):
 
 ```SQL
 SELECT * FROM q.views;
 ```
 
-You can find out the version with 
+This is equivalent to calling the procedural variant:
 
-```SQL
+```sql
+CALL q.views('test');
+```
+
+In many cases there is also a `all_` variant:
+
+```mysql
+CALL q.all_views;
+-- or
+SELECT * FROM q.all_views;
+```
+
+You can find out the version of qtools with 
+
+```mysql
 SELECT * FROM q.version;
+-- or
+CALL q.version;
 ```
 
 And get help with 
@@ -25,9 +52,90 @@ And get help with
 SELECT * FROM q.help
 ```
 
-Alternatively you can use the CALL syntax for these 2:
+## Available tools
 
-```SQL
-CALL q.version;
-CALL q.help;
+### views, all_views
+
+Shows a flat list of all the views in the currently selected database schema, or from all database schemas
+
+```mysql
+[localhost]: (Andy@localhost) [test]> select * from q.views;
++---------+
+| Views   |
++---------+
+| example |
++---------+
+1 row in set (0.00 sec)
+
+[localhost]: (Andy@localhost) [test]> call q.views('test');
++--------------+
+| View in test |
++--------------+
+| example      |
++--------------+
+1 row in set (0.00 sec)
+
+Query OK, 0 rows affected (0.00 sec)
+
+[localhost]: (Andy@localhost) [test]> call q.all_views;
++--------------------+------------------------------+
+| Database           | View                         |
++--------------------+------------------------------+
+| q                  | all_events                   |
+| q                  | tables                       |
+| q                  | views                        |
+| q                  | version                      |
+| q                  | routines                     |
+| q                  | procedures                   |
+| q                  | help                         |
+| q                  | functions                    |
+| q                  | events                       |
+| q                  | all_views                    |
+| q                  | all_tables                   |
+| q                  | all_routines                 |
+| q                  | all_procedures               |
+| q                  | all_functions                |
+| test               | example                      |
++--------------------+------------------------------+
+15 rows in set (0.02 sec)
+
+Query OK, 0 rows affected (0.02 sec)
 ```
+
+### users
+
+Shows a list of all the user accounts available on the server as well as a selection of their global privileges.
+
+The privileges shown are put in shorthand:
+
+```mysql
+[localhost]: (Andy@localhost) [test]> select * from users;
++-------------------------------------+--------------------------------+
+| User                                | Global Privileges             |
++-------------------------------------+--------------------------------+
+| test@localhost                      | S...... ..... <..> (.) {.} [.] |
+| example@example.com                 | SIUDAC. drspf <.C> (*) {S} [.] |
+| Andy@localhost                      | SIUDACX drspf <SC> (*) {S} [G] |
++-------------------------------------+--------------------------------+
+```
+
+Privileges are printed in 6 columns.
+
+The first column will put a letter in upper case for each user that has the corresponding privilege: 
+
+**S**elect, **I**nsert, **U**pdate, **D**elete, **A**lter, **C**reate, e**X**ecute.
+
+The second column will print a letter in lower case for the corresponding privilege:
+
+**d**rop, **r**eload, **s**hutdown, **p**rocess, **f**ile
+
+Column number 3 deals with replication privileges and is printed between angular brackets `< >`.
+
+Replication **S**lave permission, and Replication **C**lient permission.
+
+The fourth column, between parens, will print an asterisk if the user has the `show all databases` privilege, or a dot if they don't.
+
+The fifth colum shows an `S` in between curly braces if the Super privilege is set, or a dot if it isn't.
+
+Finally in the sixth column a `G` is printed inside square brackets for those accounts that have a `GRANT OPTION`, or a dot for those that are without this privilege.
+

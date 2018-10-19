@@ -322,6 +322,7 @@ CREATE PROCEDURE all_views()
   LANGUAGE SQL
    READS SQL DATA
     NOT DETERMINISTIC
+     SQL SECURITY INVOKER
 BEGIN
 	SELECT * FROM `q`.`all_views`;
 END; ___
@@ -331,6 +332,7 @@ CREATE PROCEDURE all_tables()
   LANGUAGE SQL
    READS SQL DATA
     NOT DETERMINISTIC
+     SQL SECURITY INVOKER
 BEGIN
 	SELECT * FROM `q`.`all_tables`;
 END; ___
@@ -340,6 +342,7 @@ CREATE PROCEDURE all_functions()
   LANGUAGE SQL
    READS SQL DATA
     NOT DETERMINISTIC
+     SQL SECURITY INVOKER
 BEGIN
 	SELECT * FROM `q`.`all_functions`;
 END; ___
@@ -349,6 +352,7 @@ CREATE PROCEDURE all_routines()
   LANGUAGE SQL
    READS SQL DATA
     NOT DETERMINISTIC
+     SQL SECURITY INVOKER
 BEGIN
 	SELECT * FROM `q`.`all_routines`;
 END; ___
@@ -358,6 +362,7 @@ CREATE PROCEDURE all_procedures()
   LANGUAGE SQL
    READS SQL DATA
     NOT DETERMINISTIC
+     SQL SECURITY INVOKER
 BEGIN
 	SELECT * FROM `q`.`all_procedures`;
 END; ___
@@ -451,6 +456,7 @@ CREATE FUNCTION substr_count(
      LANGUAGE SQL
       CONTAINS SQL
        DETERMINISTIC
+        SQL SECURITY INVOKER
 BEGIN
 	DECLARE beginCount INT(11) UNSIGNED DEFAULT CHAR_LENGTH(haystack);
 	DECLARE replaced TEXT DEFAULT REPLACE(haystack,needle,'');
@@ -468,6 +474,7 @@ CREATE FUNCTION formatQuartetCompoundTime(
     LANGUAGE SQL
      READS SQL DATA
       DETERMINISTIC
+       SQL SECURITY INVOKER
 BEGIN
 	DECLARE cpos SMALLINT(1) DEFAULT LOCATE(':',inEvery);
 	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
@@ -516,6 +523,7 @@ CREATE FUNCTION formatTrippleCompoundTime(
     LANGUAGE SQL
      READS SQL DATA
       DETERMINISTIC
+       SQL SECURITY INVOKER
 BEGIN
 	DECLARE cpos SMALLINT(1) DEFAULT LOCATE(':',inEvery);
 	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
@@ -563,6 +571,7 @@ CREATE FUNCTION formatDoubleCompoundTime(
      LANGUAGE SQL
       READS SQL DATA
        DETERMINISTIC
+        SQL SECURITY INVOKER
 BEGIN
 	DECLARE cpos SMALLINT(1) DEFAULT LOCATE(':',inEvery);
 	DECLARE ccount SMALLINT(1) UNSIGNED DEFAULT `q`.`substr_count`(inEvery,':');
@@ -637,6 +646,7 @@ CREATE FUNCTION formatEventTime(
      LANGUAGE SQL
       READS SQL DATA
        DETERMINISTIC
+        SQL SECURITY INVOKER
 BEGIN
 	DECLARE description VARCHAR(256) DEFAULT '';
 	
@@ -836,6 +846,37 @@ CREATE SQL SECURITY INVOKER VIEW `all_tables` AS
           `TABLE_NAME` ASC;
 ___
 
+CREATE SQL SECURITY INVOKER VIEW `users` AS
+ SELECT CONCAT(`user`,'@',`host`) AS `User`, 
+ CONCAT
+ (
+	IF(`Select_priv`='Y','S','.'),
+	IF(`Insert_priv`='Y','I','.'),
+	IF(`Update_priv`='Y','U','.'),
+	IF(`Delete_priv`='Y','D','.'),
+	IF(`Alter_priv`='Y','A','.'),
+	IF(`Create_priv`='Y','C','.'),
+	IF(`Execute_priv`='Y','X','.'),
+	' ',
+	IF(`Drop_priv`='Y','d','.'),
+	IF(`Reload_priv`='Y','r','.'),
+	IF(`Shutdown_priv`='Y','s','.'),
+	IF(`Process_priv`='Y','p','.'),
+	IF(`File_priv`='Y','f','.'),
+	' <',
+	IF(`Repl_slave_priv`='Y','S','.'),
+	IF(`Repl_client_priv`='Y','C','.'),
+	'> ',
+	IF(`Show_db_priv`='Y','(*)','(.)'),
+	' ',
+	IF(`Super_Priv`='Y','{S}','{.}'),
+	' ',
+	IF(`Grant_priv`='Y','[G]','[.]')
+ ) AS `Global Privileges` 
+ FROM `mysql`.`user`
+ ORDER BY `mysql`.`user`.`user` ASC, `mysql`.`user`.`host` ASC;
+___
+
 CREATE PROCEDURE tables( in_table_schema CHAR(200))
  COMMENT 'Shows a formatted list of all the tables in the specified database schema'
   LANGUAGE SQL
@@ -867,6 +908,17 @@ BEGIN
 END;
 ___
 
+CREATE PROCEDURE users()
+ COMMENT 'Shows a list of all available user accounts and their global privileges'
+  LANGUAGE SQL
+   READS SQL DATA
+    NOT DETERMINISTIC
+     SQL SECURITY INVOKER
+BEGIN
+ SELECT * FROM `q`.`users`;
+END;
+___
+ 
 CREATE PROCEDURE procedures( in_schema CHAR(200) )
  COMMENT 'Shows a list of all available procedures in the specified database'
   LANGUAGE SQL
@@ -1074,7 +1126,6 @@ CREATE SQL SECURITY INVOKER VIEW `events` AS
 
 CREATE PROCEDURE qtools_install_finished()
 BEGIN
-
 	SELECT CONCAT(version,' has been installed') AS `Info`
 	FROM `q`.`version`;
 	
