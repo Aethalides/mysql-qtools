@@ -110,32 +110,26 @@ The privileges shown are put in shorthand:
 
 ```mysql
 [localhost]: (Andy@localhost) [test]> select * from users;
-+-------------------------------------+--------------------------------+
-| User                                | Global Privileges             |
-+-------------------------------------+--------------------------------+
-| test@localhost                      | S...... ..... <..> (.) {.} [.] |
-| example@example.com                 | SIUDAC. drspf <.C> (*) {S} [.] |
-| Andy@localhost                      | SIUDACX drspf <SC> (*) {S} [G] |
-+-------------------------------------+--------------------------------+
++-------------------------------------+--------------------------+
+| User                                | Global Privileges        |
++-------------------------------------+--------------------------+
+| test@localhost                      | S..... ..... (.) {.} [.] |
+| example@example.com                 | SIUDAC drspf (*) {S} [.] |
+| Andy@localhost                      | SIUDAC drspf (*) {S} [G] |
++-------------------------------------+--------------------------+
 ```
 
-Privileges are printed in 6 columns.
+Privileges are printed in 5 columns. The first column will put a letter in upper case for each user that has the corresponding privilege: 
 
-The first column will put a letter in upper case for each user that has the corresponding privilege: 
-
-**S**elect, **I**nsert, **U**pdate, **D**elete, **A**lter, **C**reate, e**X**ecute.
+**S**elect, **I**nsert, **U**pdate, **D**elete, **A**lter, **C**reate.
 
 The second column will print a letter in lower case for the corresponding privilege:
 
 **d**rop, **r**eload, **s**hutdown, **p**rocess, **f**ile
 
-Column number 3 deals with replication privileges and is printed between angular brackets `< >`.
+The third column, between parens, will print an asterisk if the user has the `show all databases` privilege, or a dot if they don't.
 
-Replication **S**lave permission, and Replication **C**lient permission.
+The fourth colum shows an `S` in between curly braces if the Super privilege is set, or a dot if it isn't.
 
-The fourth column, between parens, will print an asterisk if the user has the `show all databases` privilege, or a dot if they don't.
-
-The fifth colum shows an `S` in between curly braces if the Super privilege is set, or a dot if it isn't.
-
-Finally in the sixth column a `G` is printed inside square brackets for those accounts that have a `GRANT OPTION`, or a dot for those that are without this privilege.
+Finally in the fifth column a `G` is printed inside square brackets for those accounts that have a `GRANT OPTION`, or a dot for those that are without this privilege.
 
