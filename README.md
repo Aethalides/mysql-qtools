@@ -2,7 +2,7 @@
 
 [TOC]
 
-# Introduction#
+# Introduction #
 
 mysql-qtools are a set of views, functions, and procedures to improve the life of the DBA using the MySQL command-line client. It includes handy tools for viewing detailed information on tables, views, routines, events, processes, users, etc, all with a minimum of typing.
 
@@ -133,3 +133,5 @@ The fourth colum shows an `S` in between curly braces if the Super privilege is 
 
 Finally in the fifth column a `G` is printed inside square brackets for those accounts that have a `GRANT OPTION`, or a dot for those that are without this privilege.
 
+# Others
+There are more tools, but I haven't finished writing the docs yet :p
