@@ -633,8 +633,6 @@ BEGIN
 	END CASE;
 END; ___
 
-create table yourmom (message text) ENGINE=MyISAM; ___
-
 CREATE FUNCTION formatEventTime(
 	inTimeZone VARCHAR(64),inAt DATETIME,
 	inStart DATETIME,inEnds DATETIME,
